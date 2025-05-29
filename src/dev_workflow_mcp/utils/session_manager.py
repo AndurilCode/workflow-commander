@@ -10,9 +10,28 @@ from ..models.workflow_state import (
     WorkflowStatus,
 )
 
+# Import S3 sync manager for state synchronization
+from .s3_sync_manager import get_s3_sync_manager
+
 # Global session store with thread-safe access
 client_sessions: dict[str, WorkflowState] = {}
 session_lock = threading.Lock()
+
+
+def _sync_session_to_s3(client_id: str, session: WorkflowState) -> None:
+    """Helper function to sync session state to S3 if enabled."""
+    try:
+        sync_manager = get_s3_sync_manager()
+        if sync_manager.is_enabled():
+            # Convert session to dictionary for S3 sync
+            session_data = session.model_dump()
+            session_id = getattr(session, 'session_id', None) or client_id
+            
+            # Attempt sync - failures are logged but don't break workflow
+            sync_manager.sync_session_state(client_id, session_id, session_data)
+    except Exception:
+        # Silently continue if S3 sync fails - workflow should not be affected
+        pass
 
 
 def get_session(client_id: str) -> WorkflowState | None:
@@ -53,6 +72,9 @@ def update_session(client_id: str, **kwargs) -> bool:
         
         # Update timestamp
         session.last_updated = datetime.now(UTC)
+        
+        # Sync to S3 if enabled
+        _sync_session_to_s3(client_id, session)
         
         return True
 
@@ -101,6 +123,10 @@ def add_log_to_session(client_id: str, entry: str) -> bool:
             return False
         
         session.add_log_entry(entry)
+        
+        # Sync to S3 if enabled
+        _sync_session_to_s3(client_id, session)
+        
         return True
 
 
@@ -142,6 +168,9 @@ def add_item_to_session(client_id: str, description: str) -> bool:
         session.items.append(new_item)
         session.last_updated = datetime.now(UTC)
         
+        # Sync to S3 if enabled
+        _sync_session_to_s3(client_id, session)
+        
         return True
 
 
@@ -155,6 +184,9 @@ def mark_item_completed_in_session(client_id: str, item_id: int) -> bool:
         result = session.mark_item_completed(item_id)
         if result:
             session.last_updated = datetime.now(UTC)
+            
+            # Sync to S3 if enabled
+            _sync_session_to_s3(client_id, session)
         
         return result
 

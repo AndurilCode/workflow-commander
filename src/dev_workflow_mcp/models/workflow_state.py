@@ -1,5 +1,6 @@
 """Workflow state models and enums."""
 
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import ClassVar
@@ -40,6 +41,7 @@ class WorkflowState(BaseModel):
 
     # Session identification
     client_id: str = Field(default="default", description="Client session identifier")
+    session_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique session identifier")
     created_at: datetime = Field(default_factory=datetime.now, description="Session creation time")
     
     # Workflow state
