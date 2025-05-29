@@ -59,3 +59,7 @@ exclude_lines = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dev_workflow_mcp"]
+
+[tool.hatch.build]
+include = ["src/dev_workflow_mcp/**/*.py"]
+exclude = ["src/dev_workflow_mcp/**/*_test.py"]
