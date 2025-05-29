@@ -1,6 +1,6 @@
 """Tests for management prompt registration and functionality."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from fastmcp import Context, FastMCP
@@ -113,6 +113,28 @@ class TestManagementPrompts:
         assert "INIT" in result
         assert "READY" in result
         assert "WORKFLOW COMPLETE" in result
+
+    @pytest.mark.asyncio
+    @patch("src.dev_workflow_mcp.prompts.management_prompts.sync_session_to_s3")
+    async def test_finalize_workflow_with_s3_sync(self, mock_sync, mock_context):
+        """Test that finalization triggers S3 sync."""
+        # Mock successful S3 sync
+        mock_sync.return_value = "s3://test-bucket/workflow-states/archived/test-client-123/2025/05/29/133045_workflow_final.json"
+
+        mcp = FastMCP("test-server")
+        register_management_prompts(mcp)
+
+        tools = await mcp.get_tools()
+        finalize_tool = tools["finalize_workflow_guidance"]
+
+        result = finalize_tool.fn(ctx=mock_context)
+
+        # Verify S3 sync was called with archive=True
+        mock_sync.assert_called_once_with("test-client-123", archive=True)
+
+        # Verify S3 key is in the output
+        assert "Workflow archived to S3" in result
+        assert "s3://test-bucket" in result
 
     @pytest.mark.asyncio
     async def test_error_recovery_guidance_output(self, mock_context):
@@ -309,8 +331,8 @@ class TestManagementPrompts:
             # All prompts should have clear action guidance (except finalize which is the end)
             if tool_name != "finalize_workflow_guidance":
                 assert (
-                    "ACTIONS" in result 
-                    or "ACTION" in result 
+                    "ACTIONS" in result
+                    or "ACTION" in result
                     or "REQUIRED" in result
                     or "NEXT STEP" in result
                     or "NEXT STEPS" in result

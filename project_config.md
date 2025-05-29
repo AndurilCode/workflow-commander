@@ -52,6 +52,7 @@ python -m src.dev_workflow_mcp.server
 ```
 
 ## Changelog
+- Added S3 synchronization capability for workflow states, enabling optional archival to Amazon S3 during workflow finalization with comprehensive error handling and graceful fallback
 - Updated bootstrap-execute-tasks.sh to embed execute-tasks content directly instead of reading from external files, with Cursor receiving YAML frontmatter format while Copilot and Claude get clean content without YAML frontmatter
 - Created bootstrap-execute-tasks.sh script that deploys execute-tasks guidelines to multiple AI assistants (Cursor, GitHub Copilot, Claude) with argument parsing, content checking, directory creation, and intelligent deployment logic
 - Removed all utility tools (hello_workflow, get_session_statistics, health_check_sessions, export_client_session, cleanup_old_sessions) from MCP server to eliminate noise and provide a clean, focused tool interface for agents

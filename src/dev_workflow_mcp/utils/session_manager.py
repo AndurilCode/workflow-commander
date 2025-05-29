@@ -3,16 +3,21 @@
 import threading
 from datetime import UTC, datetime
 
+from ..models.config import S3Config
 from ..models.workflow_state import (
     WorkflowItem,
     WorkflowPhase,
     WorkflowState,
     WorkflowStatus,
 )
+from .s3_client import S3SyncClient
 
 # Global session store with thread-safe access
 client_sessions: dict[str, WorkflowState] = {}
 session_lock = threading.Lock()
+
+# S3 client for state synchronization
+_s3_client: S3SyncClient | None = None
 
 
 def get_session(client_id: str) -> WorkflowState | None:
@@ -207,4 +212,120 @@ def migrate_session_from_markdown(client_id: str, markdown_content: str) -> bool
             client_sessions[client_id] = state
             return True
     except Exception:
-        return False 
+        return False
+
+
+def initialize_s3_client(config: S3Config) -> None:
+    """Initialize the S3 client with configuration."""
+    global _s3_client
+    _s3_client = S3SyncClient(config)
+
+
+def sync_session_to_s3(client_id: str, archive: bool = False) -> str | None:
+    """Sync a session to S3.
+    
+    Args:
+        client_id: Unique client identifier
+        archive: Whether to archive as completed workflow
+        
+    Returns:
+        S3 key if successful, None otherwise
+    """
+    if not _s3_client:
+        return None
+    
+    session = get_session(client_id)
+    if not session:
+        return None
+    
+    # Convert session to dict for S3 storage
+    state_dict = {
+        "client_id": session.client_id,
+        "created_at": session.created_at.isoformat(),
+        "last_updated": session.last_updated.isoformat(),
+        "phase": session.phase.value,
+        "status": session.status.value,
+        "current_item": session.current_item,
+        "plan": session.plan,
+        "items": [
+            {"id": item.id, "description": item.description, "status": item.status}
+            for item in session.items
+        ],
+        "log": session.log,
+        "archive_log": session.archive_log,
+        "markdown_export": session.to_markdown(),
+    }
+    
+    if archive and _s3_client.config.archive_completed:
+        return _s3_client.archive_completed_workflow(client_id, state_dict)
+    else:
+        return _s3_client.sync_workflow_state(client_id, state_dict)
+
+
+def restore_session_from_s3(client_id: str, s3_key: str) -> bool:
+    """Restore a session from S3.
+    
+    Args:
+        client_id: Unique client identifier
+        s3_key: S3 key to restore from
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    if not _s3_client:
+        return False
+    
+    state_data = _s3_client.retrieve_workflow_state(s3_key)
+    if not state_data:
+        return False
+    
+    try:
+        # Reconstruct WorkflowState from S3 data
+        items = [WorkflowItem(**item) for item in state_data.get("items", [])]
+        
+        state = WorkflowState(
+            client_id=client_id,
+            phase=WorkflowPhase(state_data.get("phase", "INIT")),
+            status=WorkflowStatus(state_data.get("status", "READY")),
+            current_item=state_data.get("current_item"),
+            plan=state_data.get("plan", ""),
+            items=items,
+            log=state_data.get("log", ""),
+            archive_log=state_data.get("archive_log", ""),
+        )
+        
+        # Update timestamps if available
+        if "created_at" in state_data:
+            state.created_at = datetime.fromisoformat(state_data["created_at"])
+        if "last_updated" in state_data:
+            state.last_updated = datetime.fromisoformat(state_data["last_updated"])
+        
+        # Store in sessions
+        with session_lock:
+            client_sessions[client_id] = state
+        
+        return True
+        
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to restore session from S3: {e}")
+        return False
+
+
+def reset_session(client_id: str) -> bool:
+    """Reset a session to initial state."""
+    with session_lock:
+        session = client_sessions.get(client_id)
+        if not session:
+            return False
+        
+        # Reset to initial state
+        session.phase = WorkflowPhase.INIT
+        session.status = WorkflowStatus.READY
+        session.current_item = None
+        session.plan = ""
+        session.log = ""
+        # Keep archive_log and items
+        session.last_updated = datetime.now(UTC)
+        
+        return True 

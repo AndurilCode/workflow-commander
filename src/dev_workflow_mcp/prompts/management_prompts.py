@@ -9,6 +9,8 @@ from ..utils.session_manager import (
     export_session_to_markdown,
     get_session,
     mark_item_completed_in_session,
+    reset_session,
+    sync_session_to_s3,
     update_session_state,
 )
 
@@ -137,15 +139,21 @@ Call: `finalize_workflow_guidance`
                 f"🏁 WORKFLOW FINALIZED - {len(completed_items)} items completed successfully"
             )
         
-        update_session_state(
-            client_id=client_id,
-            phase=WorkflowPhase.INIT,
-            status=WorkflowStatus.READY,
-            current_item=None
-        )
-        
-        # Get final state to return
+        # Get final state before reset
         updated_state = export_session_to_markdown(client_id)
+        
+        # Sync to S3 if enabled (archive mode)
+        s3_key = sync_session_to_s3(client_id, archive=True)
+        if s3_key:
+            add_log_to_session(client_id, f"📤 Workflow archived to S3: {s3_key}")
+        
+        # Reset session state
+        reset_session(client_id)
+        
+        # Build S3 sync message
+        s3_msg = ""
+        if s3_key:
+            s3_msg = f"\n- Workflow archived to S3: `{s3_key}`"
         
         return f"""🏁 WORKFLOW FINALIZED
 
@@ -153,7 +161,7 @@ Call: `finalize_workflow_guidance`
 - Phase → INIT
 - Status → READY
 - CurrentItem → null
-- Final summary logged and archived
+- Final summary logged and archived{s3_msg}
 
 **📋 FINAL WORKFLOW STATE:**
 ```markdown

@@ -10,6 +10,7 @@ An MCP (Model Context Protocol) server that provides structured workflow guidanc
 - **Error Recovery**: Built-in error handling and recovery guidance
 - **Multi-Item Processing**: Supports iterating through multiple workflow items
 - **Changelog Integration**: Automatically updates project changelog
+- **S3 Integration**: Optional workflow state synchronization to Amazon S3 for persistence and archival
 
 ## Installation
 
@@ -227,3 +228,116 @@ CurrentItem: Add user authentication to the API
 **🔄 NEXT STEP:**
 Call: `blueprint_phase_guidance`
 Parameters: task_description="Add user authentication to the API", requirements_summary="..."
+
+## S3 Integration
+
+The workflow commander supports optional S3 synchronization for workflow states, allowing you to persist and archive workflow data across sessions.
+
+### Configuration
+
+Enable S3 integration by setting the following environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `S3_SYNC_ENABLED` | Enable S3 synchronization (`true`/`false`) | `false` |
+| `S3_BUCKET_NAME` | S3 bucket name for workflow states | - |
+| `AWS_REGION` | AWS region for S3 bucket | `us-east-1` |
+| `S3_PREFIX` | S3 key prefix for workflow states | `workflow-states/` |
+
+### AWS Credentials
+
+AWS credentials should be provided via environment variables:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `AWS_ACCESS_KEY_ID` | AWS access key ID | Yes |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret access key | Yes |
+| `AWS_SESSION_TOKEN` | AWS session token (for temporary credentials) | No |
+
+The server uses the standard AWS SDK credential chain, with environment variables being the recommended approach for security and portability.
+
+### Required IAM Policies
+
+The AWS credentials must have the following S3 permissions for the configured bucket:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::your-bucket-name/*",
+                "arn:aws:s3:::your-bucket-name"
+            ]
+        }
+    ]
+}
+```
+
+**Minimum required permissions:**
+- `s3:PutObject` - For syncing and archiving workflow states
+- `s3:GetObject` - For retrieving workflow states
+- `s3:ListBucket` - For listing workflow states
+
+**Optional permissions** (if you want to manage the bucket):
+- `s3:CreateBucket` - To create the bucket if it doesn't exist
+- `s3:DeleteObject` - To clean up old workflow states
+
+### Features
+
+- **Automatic Archival**: Completed workflows are automatically archived to S3 on finalization
+- **Structured Storage**: Workflows are organized by date and client ID
+- **Graceful Fallback**: If S3 is unavailable, the server continues to work with in-memory storage
+- **State Recovery**: Archived workflows can be retrieved from S3 for reference
+
+### S3 Bucket Structure
+
+```
+s3://your-bucket/
+  workflow-states/
+    active/
+      {client_id}/
+        workflow_state.json     # Current active workflow
+    archived/
+      {client_id}/
+        {year}/{month}/{day}/
+          {timestamp}_workflow_final.json  # Archived completed workflows
+```
+
+### Example Configuration
+
+```bash
+# AWS credentials (required when S3 sync is enabled)
+export AWS_ACCESS_KEY_ID=your-access-key-id
+export AWS_SECRET_ACCESS_KEY=your-secret-access-key
+
+# S3 configuration
+export S3_SYNC_ENABLED=true
+export S3_BUCKET_NAME=my-workflow-states
+export AWS_REGION=us-west-2
+export S3_PREFIX=workflow-states/  # optional, defaults to workflow-states/
+
+# Run the server
+python -m src.dev_workflow_mcp.server
+```
+
+When S3 sync is enabled, you'll see confirmation in the server logs:
+```
+INFO:root:S3 sync enabled: my-workflow-states
+```
+
+And in the workflow finalization output:
+```
+✅ STATE UPDATED AUTOMATICALLY:
+- Phase → INIT
+- Status → READY
+- CurrentItem → null
+- Final summary logged and archived
+- Workflow archived to S3: `workflow-states/archived/client-123/2025/05/29/133045_workflow_final.json`
+```

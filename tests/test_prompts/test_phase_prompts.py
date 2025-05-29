@@ -275,7 +275,7 @@ class TestPhasePrompts:
             assert task in result
             # All prompts should have clear action guidance
             assert (
-                "REQUIRED ACTIONS" in result 
+                "REQUIRED ACTIONS" in result
                 or "ACTIONS TO TAKE" in result
                 or "NEXT STEP" in result
                 or "Call:" in result
@@ -323,7 +323,7 @@ class TestPhasePrompts:
                 continue
 
             assert (
-                "REQUIRED ACTIONS" in result 
+                "REQUIRED ACTIONS" in result
                 or "ACTIONS TO TAKE" in result
                 or "NEXT STEP" in result
                 or "Call:" in result
