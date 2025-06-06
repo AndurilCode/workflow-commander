@@ -708,14 +708,33 @@ class WorkflowCacheManager:
         Returns:
             List of cache metadata for the client's sessions
         """
+        return self._get_sessions_with_filter({"client_id": client_id})
+
+    def get_all_sessions(self) -> list[CacheMetadata]:
+        """Get all cached sessions across all clients.
+        
+        Returns:
+            List of cache metadata for all sessions
+        """
+        return self._get_sessions_with_filter(None)
+
+    def _get_sessions_with_filter(self, where_filter: dict | None) -> list[CacheMetadata]:
+        """Helper method to get sessions with optional filtering.
+        
+        Args:
+            where_filter: Optional WHERE filter for ChromaDB query
+            
+        Returns:
+            List of cache metadata for matching sessions
+        """
         if not self._ensure_initialized():
             return []
             
         try:
             with self._lock:
-                # Query for all sessions of this client
+                # Query for sessions with optional filter
                 results = self._collection.get(
-                    where={"client_id": client_id},
+                    where=where_filter,
                     include=["metadatas"]
                 )
                 
@@ -749,7 +768,8 @@ class WorkflowCacheManager:
                 return metadatas
                 
         except Exception as e:
-            print(f"Warning: Failed to get sessions for client {client_id}: {e}")
+            filter_desc = f"filter {where_filter}" if where_filter else "no filter"
+            print(f"Warning: Failed to get sessions with {filter_desc}: {e}")
             return []
 
     def cleanup_old_entries(self, max_age_days: int = 30) -> int:
