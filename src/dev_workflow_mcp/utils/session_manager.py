@@ -34,11 +34,61 @@ _cache_manager = None
 _cache_manager_lock = threading.Lock()
 
 
+def _get_server_config_from_service():
+    """Get server configuration from the configuration service.
+    
+    Returns:
+        ServerConfig or None: Legacy server config instance or None if not available
+    """
+    try:
+        from ..services.dependency_injection import get_service
+        from ..services.config_service import ConfigurationService
+        
+        # Try to get from dependency injection first
+        config_service = get_service(ConfigurationService)
+        if config_service:
+            return config_service.to_legacy_server_config()
+    except Exception:
+        pass
+    
+    try:
+        from ..services.config_service import get_configuration_service
+        
+        # Fallback to global configuration service
+        config_service = get_configuration_service()
+        return config_service.to_legacy_server_config()
+    except Exception:
+        pass
+    
+    return None
+
+
+def _get_effective_server_config():
+    """Get effective server configuration using modern service or legacy fallback.
+    
+    Returns:
+        ServerConfig or None: Configuration instance
+    """
+    # Try modern configuration service first
+    service_config = _get_server_config_from_service()
+    if service_config:
+        return service_config
+    
+    # Fallback to legacy global variable
+    global _server_config
+    with _server_config_lock:
+        return _server_config
+
+
 def set_server_config(server_config) -> None:
     """Set the server configuration for auto-sync functionality.
 
     Args:
         server_config: ServerConfig instance with session storage settings
+        
+    Note:
+        This function is maintained for backward compatibility but is deprecated.
+        New code should use the configuration service instead.
     """
     global _server_config, _cache_manager
     with _server_config_lock:
@@ -564,15 +614,14 @@ def _sync_session_to_file(
     Returns:
         bool: True if sync succeeded or was skipped, False on error
     """
-    global _server_config
-
-    with _server_config_lock:
-        if not _server_config or not _server_config.enable_local_state_file:
-            return True  # Skip if disabled or no config
+    config = _get_effective_server_config()
+    
+    if not config or not config.enable_local_state_file:
+        return True  # Skip if disabled or no config
 
     try:
         # Ensure sessions directory exists
-        if not _server_config.ensure_sessions_dir():
+        if not config.ensure_sessions_dir():
             return False
 
         # Get session content - avoid lock re-acquisition if session provided
@@ -582,19 +631,19 @@ def _sync_session_to_file(
             return False
 
         # Determine file format and content
-        format_ext = _server_config.local_state_file_format.lower()
+        format_ext = config.local_state_file_format.lower()
 
         # Generate or use existing unique filename for this session
         if not session.session_filename:
             # Generate new unique filename and store it in session
             unique_filename = _generate_unique_session_filename(
-                session_id, format_ext, _server_config.sessions_dir
+                session_id, format_ext, config.sessions_dir
             )
             session.session_filename = unique_filename
 
-        session_file = _server_config.sessions_dir / session.session_filename
+        session_file = config.sessions_dir / session.session_filename
 
-        if _server_config.local_state_file_format == "JSON":
+        if config.local_state_file_format == "JSON":
             content = session.to_json()
         else:
             content = session.to_markdown()
@@ -1197,17 +1246,16 @@ def _archive_session_file(session: DynamicWorkflowState) -> bool:
     Returns:
         bool: True if archiving succeeded, False otherwise
     """
-    global _server_config
-
-    with _server_config_lock:
-        if not _server_config or not _server_config.enable_local_state_file:
-            return True  # Skip if disabled
+    config = _get_effective_server_config()
+    
+    if not config or not config.enable_local_state_file:
+        return True  # Skip if disabled
 
     try:
         if not session.session_filename:
             return True  # No file to archive
 
-        sessions_dir = _server_config.sessions_dir
+        sessions_dir = config.sessions_dir
         current_file = sessions_dir / session.session_filename
 
         if not current_file.exists():

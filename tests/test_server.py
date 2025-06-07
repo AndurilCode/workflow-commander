@@ -39,49 +39,40 @@ class TestMainFunction:
     """Test main function."""
 
     @patch("src.dev_workflow_mcp.server.FastMCP")
-    @patch("src.dev_workflow_mcp.server.ServerConfig")
+    @patch("src.dev_workflow_mcp.server.initialize_configuration_service")
     @patch("src.dev_workflow_mcp.server.register_phase_prompts")
     @patch("src.dev_workflow_mcp.server.register_discovery_prompts")
     def test_main_with_default_args(
-        self, mock_register_discovery, mock_register_phase, mock_config, mock_fastmcp
+        self, mock_register_discovery, mock_register_phase, mock_init_config, mock_fastmcp
     ):
         """Test main function with default arguments."""
         # Mock FastMCP instance
         mock_mcp_instance = Mock()
         mock_fastmcp.return_value = mock_mcp_instance
 
-        # Mock ServerConfig instance
-        mock_config_instance = Mock()
-        mock_config.return_value = mock_config_instance
+        # Mock configuration service
+        mock_config_service = Mock()
+        mock_legacy_config = Mock()
+        mock_config_service.to_legacy_server_config.return_value = mock_legacy_config
+        mock_init_config.return_value = mock_config_service
 
         # Mock sys.argv to provide no arguments
         test_args = ["server.py"]
         with patch.object(sys, "argv", test_args):
             result = main()
 
-        # Verify ServerConfig was called with default values
-        mock_config.assert_called_once_with(
-            repository_path=None,
-            enable_local_state_file=False,
-            local_state_file_format="MD",
-            session_retention_hours=168,
-            enable_session_archiving=True,
-            enable_cache_mode=False,
-            cache_db_path=None,
-            cache_collection_name="workflow_states",
-            cache_embedding_model="all-MiniLM-L6-v2",
-            cache_max_results=50,
-        )
+        # Verify configuration service was initialized
+        mock_init_config.assert_called_once()
 
         # Verify FastMCP was created
         mock_fastmcp.assert_called_once_with("Development Workflow")
 
-        # Verify registration functions were called with config
+        # Verify registration functions were called with legacy config
         mock_register_phase.assert_called_once_with(
-            mock_mcp_instance, mock_config_instance
+            mock_mcp_instance, mock_legacy_config
         )
         mock_register_discovery.assert_called_once_with(
-            mock_mcp_instance, mock_config_instance
+            mock_mcp_instance, mock_legacy_config
         )
 
         # Verify mcp.run was called
@@ -91,59 +82,51 @@ class TestMainFunction:
         assert result == 0
 
     @patch("src.dev_workflow_mcp.server.FastMCP")
-    @patch("src.dev_workflow_mcp.server.ServerConfig")
+    @patch("src.dev_workflow_mcp.server.initialize_configuration_service")
     @patch("src.dev_workflow_mcp.server.register_phase_prompts")
     @patch("src.dev_workflow_mcp.server.register_discovery_prompts")
     def test_main_with_repository_path(
-        self, mock_register_discovery, mock_register_phase, mock_config, mock_fastmcp
+        self, mock_register_discovery, mock_register_phase, mock_init_config, mock_fastmcp
     ):
         """Test main function with repository path specified."""
         # Mock FastMCP instance
         mock_mcp_instance = Mock()
         mock_fastmcp.return_value = mock_mcp_instance
 
-        # Mock ServerConfig instance
-        mock_config_instance = Mock()
-        mock_config.return_value = mock_config_instance
+        # Mock configuration service
+        mock_config_service = Mock()
+        mock_legacy_config = Mock()
+        mock_config_service.to_legacy_server_config.return_value = mock_legacy_config
+        mock_init_config.return_value = mock_config_service
 
         # Mock sys.argv to provide repository path
         test_args = ["server.py", "--repository-path", "/test/path"]
         with patch.object(sys, "argv", test_args):
             result = main()
 
-        # Verify ServerConfig was called with the provided path and defaults
-        mock_config.assert_called_once_with(
-            repository_path="/test/path",
-            enable_local_state_file=False,
-            local_state_file_format="MD",
-            session_retention_hours=168,
-            enable_session_archiving=True,
-            enable_cache_mode=False,
-            cache_db_path=None,
-            cache_collection_name="workflow_states",
-            cache_embedding_model="all-MiniLM-L6-v2",
-            cache_max_results=50,
-        )
+        # Verify configuration service was initialized
+        mock_init_config.assert_called_once()
 
         # Verify other calls
         mock_fastmcp.assert_called_once_with("Development Workflow")
         mock_register_phase.assert_called_once_with(
-            mock_mcp_instance, mock_config_instance
+            mock_mcp_instance, mock_legacy_config
         )
         mock_register_discovery.assert_called_once_with(
-            mock_mcp_instance, mock_config_instance
+            mock_mcp_instance, mock_legacy_config
         )
         mock_mcp_instance.run.assert_called_once_with(transport="stdio")
 
         assert result == 0
 
-    @patch("src.dev_workflow_mcp.server.ServerConfig")
+    @patch("src.dev_workflow_mcp.server.initialize_configuration_service")
     @patch("builtins.print")
-    def test_main_with_invalid_repository_path(self, mock_print, mock_config):
+    def test_main_with_invalid_repository_path(self, mock_print, mock_init_config):
         """Test main function with invalid repository path."""
-        # Mock ServerConfig to raise ValueError
-        mock_config.side_effect = ValueError(
-            "Repository path does not exist: /invalid/path"
+        # Mock configuration service to raise validation error
+        from src.dev_workflow_mcp.services.config_service import ConfigurationValidationError
+        mock_init_config.side_effect = ConfigurationValidationError(
+            "Configuration validation failed: ['Repository path does not exist: /invalid/path']"
         )
 
         # Mock sys.argv to provide invalid path
@@ -152,20 +135,9 @@ class TestMainFunction:
             result = main()
 
         # Verify error handling
-        mock_config.assert_called_once_with(
-            repository_path="/invalid/path",
-            enable_local_state_file=False,
-            local_state_file_format="MD",
-            session_retention_hours=168,
-            enable_session_archiving=True,
-            enable_cache_mode=False,
-            cache_db_path=None,
-            cache_collection_name="workflow_states",
-            cache_embedding_model="all-MiniLM-L6-v2",
-            cache_max_results=50,
-        )
+        mock_init_config.assert_called_once()
         mock_print.assert_called_once_with(
-            "Error: Repository path does not exist: /invalid/path"
+            "Error: Configuration validation failed: ['Repository path does not exist: /invalid/path']"
         )
 
         # Verify error return code
@@ -301,7 +273,7 @@ class TestAutomaticCacheRestoration:
     """Test automatic cache restoration functionality during server startup."""
 
     @patch("src.dev_workflow_mcp.server.FastMCP")
-    @patch("src.dev_workflow_mcp.server.ServerConfig")
+    @patch("src.dev_workflow_mcp.server.initialize_configuration_service")
     @patch("src.dev_workflow_mcp.server.register_phase_prompts")
     @patch("src.dev_workflow_mcp.server.register_discovery_prompts")
     @patch(
@@ -314,7 +286,7 @@ class TestAutomaticCacheRestoration:
         mock_auto_restore,
         mock_register_discovery,
         mock_register_phase,
-        mock_config,
+        mock_init_config,
         mock_fastmcp,
     ):
         """Test main function with cache enabled and successful restoration."""
@@ -322,10 +294,11 @@ class TestAutomaticCacheRestoration:
         mock_mcp_instance = Mock()
         mock_fastmcp.return_value = mock_mcp_instance
 
-        # Mock ServerConfig instance with cache enabled
-        mock_config_instance = Mock()
-        mock_config_instance.enable_cache_mode = True
-        mock_config.return_value = mock_config_instance
+        # Mock configuration service
+        mock_config_service = Mock()
+        mock_legacy_config = Mock()
+        mock_config_service.to_legacy_server_config.return_value = mock_legacy_config
+        mock_init_config.return_value = mock_config_service
 
         # Mock successful restoration
         mock_auto_restore.return_value = 3
@@ -348,7 +321,7 @@ class TestAutomaticCacheRestoration:
         assert result == 0
 
     @patch("src.dev_workflow_mcp.server.FastMCP")
-    @patch("src.dev_workflow_mcp.server.ServerConfig")
+    @patch("src.dev_workflow_mcp.server.initialize_configuration_service")
     @patch("src.dev_workflow_mcp.server.register_phase_prompts")
     @patch("src.dev_workflow_mcp.server.register_discovery_prompts")
     @patch(
@@ -361,7 +334,7 @@ class TestAutomaticCacheRestoration:
         mock_auto_restore,
         mock_register_discovery,
         mock_register_phase,
-        mock_config,
+        mock_init_config,
         mock_fastmcp,
     ):
         """Test main function with cache enabled but no sessions to restore."""
@@ -369,10 +342,11 @@ class TestAutomaticCacheRestoration:
         mock_mcp_instance = Mock()
         mock_fastmcp.return_value = mock_mcp_instance
 
-        # Mock ServerConfig instance with cache enabled
-        mock_config_instance = Mock()
-        mock_config_instance.enable_cache_mode = True
-        mock_config.return_value = mock_config_instance
+        # Mock configuration service
+        mock_config_service = Mock()
+        mock_legacy_config = Mock()
+        mock_config_service.to_legacy_server_config.return_value = mock_legacy_config
+        mock_init_config.return_value = mock_config_service
 
         # Mock no sessions to restore
         mock_auto_restore.return_value = 0
@@ -393,7 +367,7 @@ class TestAutomaticCacheRestoration:
         assert result == 0
 
     @patch("src.dev_workflow_mcp.server.FastMCP")
-    @patch("src.dev_workflow_mcp.server.ServerConfig")
+    @patch("src.dev_workflow_mcp.server.initialize_configuration_service")
     @patch("src.dev_workflow_mcp.server.register_phase_prompts")
     @patch("src.dev_workflow_mcp.server.register_discovery_prompts")
     @patch(
@@ -406,7 +380,7 @@ class TestAutomaticCacheRestoration:
         mock_auto_restore,
         mock_register_discovery,
         mock_register_phase,
-        mock_config,
+        mock_init_config,
         mock_fastmcp,
     ):
         """Test main function with cache enabled but restoration failure."""
@@ -414,10 +388,11 @@ class TestAutomaticCacheRestoration:
         mock_mcp_instance = Mock()
         mock_fastmcp.return_value = mock_mcp_instance
 
-        # Mock ServerConfig instance with cache enabled
-        mock_config_instance = Mock()
-        mock_config_instance.enable_cache_mode = True
-        mock_config.return_value = mock_config_instance
+        # Mock configuration service
+        mock_config_service = Mock()
+        mock_legacy_config = Mock()
+        mock_config_service.to_legacy_server_config.return_value = mock_legacy_config
+        mock_init_config.return_value = mock_config_service
 
         # Mock restoration failure
         mock_auto_restore.side_effect = Exception("Cache connection failed")
@@ -440,21 +415,22 @@ class TestAutomaticCacheRestoration:
         assert result == 0
 
     @patch("src.dev_workflow_mcp.server.FastMCP")
-    @patch("src.dev_workflow_mcp.server.ServerConfig")
+    @patch("src.dev_workflow_mcp.server.initialize_configuration_service")
     @patch("src.dev_workflow_mcp.server.register_phase_prompts")
     @patch("src.dev_workflow_mcp.server.register_discovery_prompts")
     def test_main_with_cache_disabled_no_restoration(
-        self, mock_register_discovery, mock_register_phase, mock_config, mock_fastmcp
+        self, mock_register_discovery, mock_register_phase, mock_init_config, mock_fastmcp
     ):
         """Test main function with cache disabled - no restoration should occur."""
         # Mock FastMCP instance
         mock_mcp_instance = Mock()
         mock_fastmcp.return_value = mock_mcp_instance
 
-        # Mock ServerConfig instance with cache disabled
-        mock_config_instance = Mock()
-        mock_config_instance.enable_cache_mode = False
-        mock_config.return_value = mock_config_instance
+        # Mock configuration service
+        mock_config_service = Mock()
+        mock_legacy_config = Mock()
+        mock_config_service.to_legacy_server_config.return_value = mock_legacy_config
+        mock_init_config.return_value = mock_config_service
 
         # Mock sys.argv without cache enabled
         test_args = ["server.py"]

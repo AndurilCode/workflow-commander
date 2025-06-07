@@ -12,6 +12,11 @@ from src.dev_workflow_mcp.utils.session_manager import (
     cleanup_completed_sessions,
     set_server_config,
 )
+from src.dev_workflow_mcp.services.config_service import (
+    ServerConfiguration,
+    initialize_configuration_service,
+    reset_configuration_service,
+)
 
 
 class TestSessionFilenameGeneration:
@@ -103,16 +108,20 @@ class TestSessionArchiving:
         session_manager.client_session_registry.clear()
 
     def test_archive_session_file_basic(self):
-        """Test basic session file archiving."""
+        """Test basic session file archiving functionality."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Create test config
-            config = ServerConfig(
-                repository_path=temp_dir,
+            # Create test config using new configuration service
+            server_config = ServerConfiguration(
+                repository_path=Path(temp_dir),
                 enable_local_state_file=True,
                 local_state_file_format="JSON",
             )
-            set_server_config(config)
-            config.ensure_sessions_dir()
+            
+            # Initialize configuration service
+            config_service = initialize_configuration_service(server_config=server_config)
+            
+            # Ensure sessions directory exists
+            server_config.sessions_dir.mkdir(parents=True, exist_ok=True)
 
             # Create test session with file
             from src.dev_workflow_mcp.models.workflow_state import DynamicWorkflowState
@@ -126,7 +135,7 @@ class TestSessionArchiving:
             )
 
             # Create the actual file
-            session_file = config.sessions_dir / session.session_filename
+            session_file = server_config.sessions_dir / session.session_filename
             session_file.write_text('{"test": "data"}')
 
             # Archive the session
@@ -136,7 +145,7 @@ class TestSessionArchiving:
             assert not session_file.exists()  # Original file should be moved
 
             # Check archived file exists
-            archived_files = list(config.sessions_dir.glob("*_COMPLETED_*.json"))
+            archived_files = list(server_config.sessions_dir.glob("*_COMPLETED_*.json"))
             assert len(archived_files) == 1
             assert (
                 "test_client_2025-06-04T10-30-00_001_COMPLETED_"
@@ -146,6 +155,7 @@ class TestSessionArchiving:
     def test_archive_session_file_no_config(self):
         """Test archiving with no server config - should skip gracefully."""
         from src.dev_workflow_mcp.models.workflow_state import DynamicWorkflowState
+        from src.dev_workflow_mcp.services.config_service import reset_configuration_service
 
         session = DynamicWorkflowState(
             client_id="test_client",
@@ -155,8 +165,8 @@ class TestSessionArchiving:
             session_filename="test.json",
         )
 
-        # Clear config
-        set_server_config(None)
+        # Clear configuration service
+        reset_configuration_service()
 
         result = _archive_session_file(session)
         assert result is True  # Should succeed but skip archiving
@@ -194,14 +204,18 @@ class TestCleanupWithArchiving:
     def test_cleanup_completed_sessions_with_archiving(self):
         """Test cleanup archives sessions before removing them from memory."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Create test config
-            config = ServerConfig(
-                repository_path=temp_dir,
+            # Create test config using new configuration service
+            server_config = ServerConfiguration(
+                repository_path=Path(temp_dir),
                 enable_local_state_file=True,
                 local_state_file_format="JSON",
             )
-            set_server_config(config)
-            config.ensure_sessions_dir()
+            
+            # Initialize configuration service
+            config_service = initialize_configuration_service(server_config=server_config)
+            
+            # Ensure sessions directory exists
+            server_config.sessions_dir.mkdir(parents=True, exist_ok=True)
 
             # Create completed session
             from datetime import UTC, datetime, timedelta
@@ -223,7 +237,7 @@ class TestCleanupWithArchiving:
             session_manager.sessions["old_client"] = session
 
             # Create the actual file
-            session_file = config.sessions_dir / session.session_filename
+            session_file = server_config.sessions_dir / session.session_filename
             session_file.write_text('{"test": "completed_data"}')
 
             # Run cleanup with archiving enabled
@@ -235,7 +249,7 @@ class TestCleanupWithArchiving:
             assert "old_client" not in session_manager.sessions
 
             # Check that file was archived
-            archived_files = list(config.sessions_dir.glob("*_COMPLETED_*.json"))
+            archived_files = list(server_config.sessions_dir.glob("*_COMPLETED_*.json"))
             assert len(archived_files) == 1
 
     def test_cleanup_completed_sessions_without_archiving(self):

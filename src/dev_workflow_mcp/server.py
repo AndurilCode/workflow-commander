@@ -1,12 +1,23 @@
 """Main MCP server implementation."""
 
 import argparse
+import os
+from pathlib import Path
 
 from fastmcp import FastMCP
 
-from .config import ServerConfig
+from .config import ServerConfig  # Keep for backward compatibility
 from .prompts.discovery_prompts import register_discovery_prompts
 from .prompts.phase_prompts import register_phase_prompts
+from .services.config_service import (
+    ConfigurationService,
+    ServerConfiguration,
+    WorkflowConfiguration,
+    PlatformConfiguration,
+    EnvironmentConfiguration,
+    initialize_configuration_service,
+)
+from .services.dependency_injection import register_singleton
 
 
 def create_arg_parser() -> argparse.ArgumentParser:
@@ -126,10 +137,11 @@ def main():
     parser = create_arg_parser()
     args = parser.parse_args()
 
-    # Create configuration
+    # Create new configuration service
     try:
-        config = ServerConfig(
-            repository_path=args.repository_path,
+        # Create server configuration from CLI arguments
+        server_config = ServerConfiguration(
+            repository_path=Path(args.repository_path) if args.repository_path else Path.cwd(),
             enable_local_state_file=args.enable_local_state_file,
             local_state_file_format=args.local_state_file_format.upper(),
             session_retention_hours=args.session_retention_hours,
@@ -140,7 +152,37 @@ def main():
             cache_embedding_model=args.cache_embedding_model,
             cache_max_results=args.cache_max_results,
         )
-    except ValueError as e:
+        
+        # Create workflow configuration based on server settings
+        workflow_config = WorkflowConfiguration(
+            local_state_file=server_config.enable_local_state_file,
+            local_state_file_format=server_config.local_state_file_format,
+        )
+        
+        # Create platform configuration with detected settings
+        platform_config = PlatformConfiguration(
+            editor_type="cursor",  # This could be auto-detected from environment
+            environment_variables=dict(os.environ),  # Pass through current environment
+        )
+        
+        # Create environment configuration (auto-detects from environment)
+        environment_config = EnvironmentConfiguration()
+        
+        # Initialize the configuration service
+        config_service = initialize_configuration_service(
+            server_config=server_config,
+            workflow_config=workflow_config,
+            platform_config=platform_config,
+            environment_config=environment_config,
+        )
+        
+        # Register configuration service in dependency injection container
+        register_singleton(ConfigurationService, lambda: config_service)
+        
+        # Create legacy config for backward compatibility
+        legacy_config = config_service.to_legacy_server_config()
+        
+    except Exception as e:
         print(f"Error: {e}")
         return 1
 
@@ -148,11 +190,12 @@ def main():
     mcp = FastMCP("Development Workflow")
 
     # Register essential YAML workflow prompts with configuration
-    register_phase_prompts(mcp, config)
-    register_discovery_prompts(mcp, config)
+    # Use legacy config for backward compatibility during migration
+    register_phase_prompts(mcp, legacy_config)
+    register_discovery_prompts(mcp, legacy_config)
 
     # Perform automatic cache restoration if cache mode is enabled
-    if config.enable_cache_mode:
+    if server_config.enable_cache_mode:
         try:
             from .utils.session_manager import auto_restore_sessions_on_startup
 
