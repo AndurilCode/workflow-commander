@@ -142,7 +142,7 @@ def _handle_dynamic_workflow(
 def _handle_cache_restore_operation(client_id: str) -> str:
     """Handle cache restore operation."""
     try:
-        from ..utils.cache_manager import restore_sessions_from_cache
+        from ..utils.session_manager import restore_sessions_from_cache
 
         restored_count = restore_sessions_from_cache(client_id)
         return f"✅ **Cache Restore Complete:** Restored {restored_count} sessions from cache for client '{client_id}'"

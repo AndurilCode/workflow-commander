@@ -302,7 +302,7 @@ def get_or_create_dynamic_session(
                 loader = WorkflowLoader()
                 workflow_def = loader.load_workflow(str(workflow_path))
 
-                return create_dynamic_session(
+            return create_dynamic_session(
                     client_id=client_id,
                     task_description=task_description,
                     workflow_def=workflow_def,
