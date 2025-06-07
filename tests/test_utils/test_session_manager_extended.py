@@ -45,7 +45,12 @@ class TestSessionManagerConfiguration:
     """Test session manager configuration functions."""
 
     def setup_method(self):
-        """Clear sessions before each test."""
+        """Clear sessions and reset services before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
         session_manager.workflow_definitions_cache.clear()
@@ -165,7 +170,12 @@ class TestSessionManagerClientRegistry:
     """Test client session registry functions."""
 
     def setup_method(self):
-        """Clear sessions before each test."""
+        """Clear sessions and reset services before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
         session_manager.workflow_definitions_cache.clear()
@@ -230,6 +240,17 @@ class TestSessionManagerClientRegistry:
 class TestSessionManagerDynamicInputs:
     """Test dynamic input preparation functions."""
 
+    def setup_method(self):
+        """Clear sessions and reset services before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
+        session_manager.sessions.clear()
+        session_manager.client_session_registry.clear()
+        session_manager.workflow_definitions_cache.clear()
+
     def test_prepare_dynamic_inputs_basic(self, test_workflow_def):
         """Test basic dynamic input preparation."""
         # Add inputs to workflow definition
@@ -285,7 +306,12 @@ class TestSessionManagerNodeOperations:
     """Test session node operation functions."""
 
     def setup_method(self):
-        """Clear sessions before each test."""
+        """Clear sessions and reset services before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
         session_manager.workflow_definitions_cache.clear()
@@ -334,7 +360,12 @@ class TestSessionManagerUtilityFunctions:
     """Test utility functions in session manager."""
 
     def setup_method(self):
-        """Clear sessions before each test."""
+        """Clear sessions and reset services before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
         session_manager.workflow_definitions_cache.clear()
@@ -427,10 +458,10 @@ class TestSessionManagerUtilityFunctions:
 
         assert result is True
         updated_session = session_manager.get_session(session.session_id)
-        # Session already has 1 initial item, adding another makes 2
-        assert len(updated_session.items) == 2
-        # The new item is added at the end (index 1), initial item at index 0
-        assert updated_session.items[1].description == "New task item"
+        # Session starts empty, adding one item makes 1
+        assert len(updated_session.items) == 1
+        # The new item is added at the end (index 0)
+        assert updated_session.items[0].description == "New task item"
 
     def test_add_item_to_session_not_exists(self):
         """Test adding item to non-existent session."""
@@ -567,7 +598,12 @@ class TestSessionManagerConflictDetection:
     """Test session conflict detection functions."""
 
     def setup_method(self):
-        """Clear sessions before each test."""
+        """Clear sessions and reset services before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
         session_manager.workflow_definitions_cache.clear()
@@ -598,7 +634,12 @@ class TestSessionManagerSummaryAndCleanup:
     """Test session summary and cleanup functions."""
 
     def setup_method(self):
-        """Clear sessions before each test."""
+        """Clear sessions and reset services before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
         session_manager.workflow_definitions_cache.clear()

@@ -53,7 +53,12 @@ class TestSessionManager:
     """Test session manager core functions."""
 
     def setup_method(self):
-        """Clear sessions before each test."""
+        """Clear sessions and reset services before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
         session_manager.workflow_definitions_cache.clear()
@@ -126,7 +131,12 @@ class TestSessionExportFunctions:
     """Test session export functions (JSON and format dispatch)."""
 
     def setup_method(self):
-        """Clear sessions before each test."""
+        """Clear sessions and reset services before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
         session_manager.workflow_definitions_cache.clear()
@@ -286,8 +296,8 @@ class TestSessionExportFunctions:
         # Verify data integrity in flat structure
         assert data["client_id"] == "complex-client"
         assert data["workflow_name"] == "Test Workflow"
-        assert len(data["items"]) == 2  # Original + added item
-        assert len(data["log"]) >= 4  # 2 initial + 2 added
+        assert len(data["items"]) == 1  # Added item (sessions start with empty items)
+        assert len(data["log"]) >= 2  # 2 added log entries
 
     def test_export_session_format_consistency(self):
         """Test that export format is consistent between calls."""

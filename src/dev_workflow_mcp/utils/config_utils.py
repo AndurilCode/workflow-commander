@@ -1,7 +1,5 @@
 """Configuration utility functions for workflow MCP server."""
 
-from typing import Optional
-
 from ..models.config import WorkflowConfig  # Keep for backward compatibility
 from ..services.config_service import (
     ConfigurationService,
@@ -26,7 +24,7 @@ def get_workflow_config(server_config=None) -> WorkflowConfig:
         if has_service(ConfigurationService):
             config_service = get_service(ConfigurationService)
             workflow_config = config_service.get_workflow_config()
-            
+
             # Convert to legacy WorkflowConfig for backward compatibility
             return WorkflowConfig(
                 local_state_file=workflow_config.local_state_file,
@@ -36,7 +34,7 @@ def get_workflow_config(server_config=None) -> WorkflowConfig:
             # Try global configuration service
             config_service = get_configuration_service()
             workflow_config = config_service.get_workflow_config()
-            
+
             # Convert to legacy WorkflowConfig for backward compatibility
             return WorkflowConfig(
                 local_state_file=workflow_config.local_state_file,
@@ -45,7 +43,7 @@ def get_workflow_config(server_config=None) -> WorkflowConfig:
     except Exception:
         # Fall back to legacy behavior if configuration service is not available
         pass
-    
+
     # Legacy behavior for backward compatibility
     if server_config:
         return WorkflowConfig.from_server_config(server_config)
@@ -54,9 +52,9 @@ def get_workflow_config(server_config=None) -> WorkflowConfig:
         return WorkflowConfig()
 
 
-def get_workflow_configuration_service() -> Optional[WorkflowConfiguration]:
+def get_workflow_configuration_service() -> WorkflowConfiguration | None:
     """Get workflow configuration from the new configuration service.
-    
+
     Returns:
         WorkflowConfiguration instance if available, None otherwise
     """

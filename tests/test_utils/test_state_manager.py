@@ -15,6 +15,11 @@ class TestStateManager:
 
     def setup_method(self):
         """Set up test environment."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
 
@@ -143,6 +148,11 @@ class TestStateManagerCompatibility:
 
     def setup_method(self):
         """Clear session state before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
 
@@ -162,6 +172,11 @@ class TestGetFileOperationInstructions:
 
     def setup_method(self):
         """Clear sessions before each test."""
+        # Reset services to ensure clean state
+        from src.dev_workflow_mcp.services import reset_session_services, initialize_session_services
+        reset_session_services()
+        initialize_session_services()
+        
         session_manager.sessions.clear()
         session_manager.client_session_registry.clear()
 

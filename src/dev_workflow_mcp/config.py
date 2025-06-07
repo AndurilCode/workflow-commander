@@ -163,6 +163,14 @@ class ServerConfig:
         except (OSError, PermissionError):
             return False
 
+    def get_sessions_dir(self) -> Path:
+        """Get the sessions directory path (compatibility method).
+        
+        Returns:
+            Path to the sessions directory.
+        """
+        return self.sessions_dir
+
     def validate_configuration(self) -> tuple[bool, list[str]]:
         """Validate the configuration and provide status information.
 

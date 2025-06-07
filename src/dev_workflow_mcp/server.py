@@ -6,15 +6,14 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 
-from .config import ServerConfig  # Keep for backward compatibility
 from .prompts.discovery_prompts import register_discovery_prompts
 from .prompts.phase_prompts import register_phase_prompts
 from .services.config_service import (
     ConfigurationService,
+    EnvironmentConfiguration,
+    PlatformConfiguration,
     ServerConfiguration,
     WorkflowConfiguration,
-    PlatformConfiguration,
-    EnvironmentConfiguration,
     initialize_configuration_service,
 )
 from .services.dependency_injection import register_singleton
@@ -141,7 +140,9 @@ def main():
     try:
         # Create server configuration from CLI arguments
         server_config = ServerConfiguration(
-            repository_path=Path(args.repository_path) if args.repository_path else Path.cwd(),
+            repository_path=Path(args.repository_path)
+            if args.repository_path
+            else Path.cwd(),
             enable_local_state_file=args.enable_local_state_file,
             local_state_file_format=args.local_state_file_format.upper(),
             session_retention_hours=args.session_retention_hours,
@@ -152,22 +153,22 @@ def main():
             cache_embedding_model=args.cache_embedding_model,
             cache_max_results=args.cache_max_results,
         )
-        
+
         # Create workflow configuration based on server settings
         workflow_config = WorkflowConfiguration(
             local_state_file=server_config.enable_local_state_file,
             local_state_file_format=server_config.local_state_file_format,
         )
-        
+
         # Create platform configuration with detected settings
         platform_config = PlatformConfiguration(
             editor_type="cursor",  # This could be auto-detected from environment
             environment_variables=dict(os.environ),  # Pass through current environment
         )
-        
+
         # Create environment configuration (auto-detects from environment)
         environment_config = EnvironmentConfiguration()
-        
+
         # Initialize the configuration service
         config_service = initialize_configuration_service(
             server_config=server_config,
@@ -175,13 +176,13 @@ def main():
             platform_config=platform_config,
             environment_config=environment_config,
         )
-        
+
         # Register configuration service in dependency injection container
         register_singleton(ConfigurationService, lambda: config_service)
-        
+
         # Create legacy config for backward compatibility
         legacy_config = config_service.to_legacy_server_config()
-        
+
     except Exception as e:
         print(f"Error: {e}")
         return 1

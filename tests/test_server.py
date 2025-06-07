@@ -43,7 +43,11 @@ class TestMainFunction:
     @patch("src.dev_workflow_mcp.server.register_phase_prompts")
     @patch("src.dev_workflow_mcp.server.register_discovery_prompts")
     def test_main_with_default_args(
-        self, mock_register_discovery, mock_register_phase, mock_init_config, mock_fastmcp
+        self,
+        mock_register_discovery,
+        mock_register_phase,
+        mock_init_config,
+        mock_fastmcp,
     ):
         """Test main function with default arguments."""
         # Mock FastMCP instance
@@ -86,7 +90,11 @@ class TestMainFunction:
     @patch("src.dev_workflow_mcp.server.register_phase_prompts")
     @patch("src.dev_workflow_mcp.server.register_discovery_prompts")
     def test_main_with_repository_path(
-        self, mock_register_discovery, mock_register_phase, mock_init_config, mock_fastmcp
+        self,
+        mock_register_discovery,
+        mock_register_phase,
+        mock_init_config,
+        mock_fastmcp,
     ):
         """Test main function with repository path specified."""
         # Mock FastMCP instance
@@ -124,7 +132,10 @@ class TestMainFunction:
     def test_main_with_invalid_repository_path(self, mock_print, mock_init_config):
         """Test main function with invalid repository path."""
         # Mock configuration service to raise validation error
-        from src.dev_workflow_mcp.services.config_service import ConfigurationValidationError
+        from src.dev_workflow_mcp.services.config_service import (
+            ConfigurationValidationError,
+        )
+
         mock_init_config.side_effect = ConfigurationValidationError(
             "Configuration validation failed: ['Repository path does not exist: /invalid/path']"
         )
@@ -419,7 +430,11 @@ class TestAutomaticCacheRestoration:
     @patch("src.dev_workflow_mcp.server.register_phase_prompts")
     @patch("src.dev_workflow_mcp.server.register_discovery_prompts")
     def test_main_with_cache_disabled_no_restoration(
-        self, mock_register_discovery, mock_register_phase, mock_init_config, mock_fastmcp
+        self,
+        mock_register_discovery,
+        mock_register_phase,
+        mock_init_config,
+        mock_fastmcp,
     ):
         """Test main function with cache disabled - no restoration should occur."""
         # Mock FastMCP instance
